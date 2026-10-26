@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full w-full overflow-hidden select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Weather Kiosk 1080p</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter, Outfit, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            kioskDark: '#070b14',
+            kioskCard: 'rgba(15, 23, 42, 0.72)',
+            kioskBorder: 'rgba(255, 255, 255, 0.08)',
+            kioskHighlight: 'rgba(56, 189, 248, 0.15)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Absolute No-Scroll Guarantee */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden !important;
+      position: fixed;
+      background-color: #050811;
+    }
+
+    /* Ambient dynamic glow spheres */
+    .glow-blob {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(120px);
+      pointer-events: none;
+      opacity: 0.22;
+      transition: background 1.5s ease-in-out;
+    }
+
+    /* Micro scrollbar removal for any container */
+    .no-scroll {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .no-scroll::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-sans flex flex-col justify-between p-4 xl:p-5 relative">
+
+  <!-- Ambient Light Effects -->
+  <div id="glowPrimary" class="glow-blob bg-cyan-600 w-[35rem] h-[35rem] -top-28 -left-28"></div>
+  <div id="glowSecondary" class="glow-blob bg-indigo-600 w-[32rem] h-[32rem] -bottom-24 -right-24"></div>
+
+  <!-- ================= TOP HEADER (Height: ~60px) ================= -->
+  <header class="h-14 w-full flex items-center justify-between px-5 rounded-2xl bg-kioskCard border border-kioskBorder backdrop-blur-2xl shadow-xl z-20 shrink-0">
+    <!-- Location Title & Coordinates / Status -->
+    <div class="flex items-center gap-3">
+      <button id="btnSearchOpen" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:scale-95 border border-kioskBorder text-left transition group">
+        <svg class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span id="locationName" class="font-display font-bold text-base text-white tracking-wide">Köln, DE</span>
+        <span class="text-[10px] text-cyan-300/80 uppercase font-mono tracking-wider ml-1 bg-cyan-950/70 px-1.5 py-0.5 rounded border border-cyan-800/40">Ändern</span>
+      </button>
+
+      <!-- Live Heartbeat Indicator -->
+      <div class="flex items-center gap-2 text-xs text-slate-400 pl-2">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span id="updateTimestamp" class="font-mono text-[11px] text-slate-400">Lädt...</span>
+      </div>
+    </div>
+
+    <!-- Integrated Search Input & Action Controls -->
+    <div class="flex items-center gap-3">
+      <div class="relative w-64 xl:w-80">
+        <input 
+          type="text" 
+          id="citySearchInput"
+          placeholder="Ort suchen (z. B. Hamburg, Wien)..." 
+          class="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-900/90 border border-kioskBorder text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/40 transition"
+          autocomplete="off"
+        />
+        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <!-- Quick Autocomplete Dropdown -->
+        <div id="searchResults" class="hidden absolute left-0 right-0 top-11 bg-slate-900/95 border border-kioskBorder rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-800"></div>
+      </div>
+
+      <!-- Unit Toggle Button (°C / °F) -->
+      <button id="btnToggleUnit" title="Einheit umschalten" class="h-9 px-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:scale-95 border border-kioskBorder text-xs font-mono font-bold text-cyan-400 transition">
+        °C
+      </button>
+
+      <!-- Instant Refresh -->
+      <button id="btnRefresh" title="Jetzt aktualisieren" class="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:scale-95 border border-kioskBorder text-slate-300 hover:text-white transition">
+        <svg id="refreshSvg" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+
+      <!-- Fullscreen Toggle (F11) -->
+      <button id="btnFullscreen" title="Vollbild umschalten" class="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:scale-95 border border-kioskBorder text-slate-300 hover:text-white transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MIDDLE MAIN AREA: CLOCK & WEATHER (Height: ~60% of 1080p) ================= -->
+  <main class="grid grid-cols-12 gap-4 xl:gap-5 my-3 flex-1 min-h-0 z-10">
+    
+    <!-- LEFT PANEL: Massive Kiosk Clock & Date (4 Cols) -->
+    <section class="col-span-4 rounded-3xl bg-kioskCard border border-kioskBorder backdrop-blur-2xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+      <!-- Glow ambient corner inside clock card -->
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Live Digital Clock -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          <span class="text-xs font-mono uppercase tracking-widest text-slate-400">Echtzeit Kiosk</span>
+        </div>
+        
+        <div class="flex items-baseline font-mono tracking-tight text-white leading-none">
+          <span id="clockHM" class="text-7xl xl:text-8xl font-black font-display tracking-tighter">--:--</span>
+          <span id="clockSec" class="text-3xl xl:text-4xl text-cyan-400 font-bold ml-2">--</span>
+        </div>
+      </div>
+
+      <!-- Date & Calendar Week Details -->
+      <div class="space-y-2 border-t border-slate-800/80 pt-4">
+        <div id="clockWeekday" class="text-2xl xl:text-3xl font-extrabold font-display text-white tracking-wide">Lade Datum...</div>
+        <div class="flex items-center justify-between text-slate-400 font-medium text-sm xl:text-base">
+          <span id="clockFullDate">--. --. ----</span>
+          <span id="clockKW" class="px-2.5 py-0.5 rounded-lg bg-slate-800/90 text-cyan-300 font-mono text-xs font-bold border border-slate-700/60">KW --</span>
+        </div>
+      </div>
+
+      <!-- Sun & Daylight Ephemeris Widget -->
+      <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800/80">
+        <div class="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <div class="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.364-6.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider">Aufgang</div>
+            <div id="sunRiseVal" class="text-sm font-bold font-mono text-white">--:--</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider">Untergang</div>
+            <div id="sunSetVal" class="text-sm font-bold font-mono text-white">--:--</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Current Weather & Sensor Metrics (8 Cols) -->
+    <section class="col-span-8 rounded-3xl bg-kioskCard border border-kioskBorder backdrop-blur-2xl p-6 flex flex-col justify-between shadow-2xl">
+      
+      <!-- Current Condition Hero Banner -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800/70">
+        <div>
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 mb-2">
+            Aktuelles Wetter
+          </span>
+          <div class="flex items-baseline gap-4">
+            <span id="tempHero" class="text-7xl xl:text-8xl font-black font-display tracking-tight text-white leading-none">--°</span>
+            <div class="flex flex-col">
+              <span id="conditionHero" class="text-2xl xl:text-3xl font-extrabold text-slate-100">Wird geladen...</span>
+              <span id="feelsLikeHero" class="text-sm font-medium text-slate-400 mt-0.5">Gefühlt wie --°</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Big Weather Vector Graphic -->
+        <div id="weatherIconContainer" class="w-24 h-24 xl:w-28 xl:h-28 flex items-center justify-center p-3 rounded-2xl bg-slate-900/50 border border-kioskBorder shadow-inner">
+          <svg class="w-16 h-16 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" stroke-width="2"/></svg>
+        </div>
+      </div>
+
+      <!-- 6 Metrics Compact Kiosk Grid (Fits effortlessly on 1080p) -->
+      <div class="grid grid-cols-6 gap-3 pt-3">
+        
+        <!-- 1: Humidity -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            <span class="truncate">Feuchte</span>
+          </div>
+          <div id="metricHumidity" class="text-xl xl:text-2xl font-black font-display text-white mt-1">--%</div>
+          <div id="metricDew" class="text-[10px] text-slate-500 font-mono">Tau: --°</div>
+        </div>
+
+        <!-- 2: Wind + Direction -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg id="windArrowSvg" class="w-3.5 h-3.5 text-teal-400 shrink-0 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            <span class="truncate">Wind</span>
+          </div>
+          <div id="metricWindSpeed" class="text-xl xl:text-2xl font-black font-display text-white mt-1">-- <span class="text-xs font-normal">km/h</span></div>
+          <div id="metricWindDir" class="text-[10px] text-slate-500 font-mono">--° (N)</div>
+        </div>
+
+        <!-- 3: Rain Probability / Precip -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 16.58A5 5 0 0018 7h-1.26A8 8 0 104 15.25M8 19v2m4-3v2m4-1v2"/></svg>
+            <span class="truncate">Regen</span>
+          </div>
+          <div id="metricRainProb" class="text-xl xl:text-2xl font-black font-display text-cyan-300 mt-1">--%</div>
+          <div id="metricPrecipAmount" class="text-[10px] text-slate-500 font-mono">0.0 mm</div>
+        </div>
+
+        <!-- 4: Air Pressure -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span class="truncate">Druck</span>
+          </div>
+          <div id="metricPressure" class="text-xl xl:text-2xl font-black font-display text-white mt-1">--</div>
+          <div class="text-[10px] text-slate-500 font-mono">hPa</div>
+        </div>
+
+        <!-- 5: UV-Index -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" stroke-width="2"/></svg>
+            <span class="truncate">UV-Index</span>
+          </div>
+          <div id="metricUVVal" class="text-xl xl:text-2xl font-black font-display text-white mt-1">--</div>
+          <div id="metricUVStatus" class="text-[10px] text-emerald-400 font-semibold truncate">Gering</div>
+        </div>
+
+        <!-- 6: Wind Gusts -->
+        <div class="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            <span class="truncate">Böen</span>
+          </div>
+          <div id="metricGusts" class="text-xl xl:text-2xl font-black font-display text-white mt-1">-- <span class="text-xs font-normal">km/h</span></div>
+          <div class="text-[10px] text-slate-500 font-mono">Spitze</div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= BOTTOM FORECAST SECTION (Height: ~30% of 1080p, Strictly Fixed) ================= -->
+  <footer class="grid grid-cols-12 gap-4 xl:gap-5 h-44 xl:h-48 z-10 shrink-0">
+    
+    <!-- Next 12 Hours Timeline (7 Cols) -->
+    <section class="col-span-7 rounded-3xl bg-kioskCard border border-kioskBorder backdrop-blur-2xl p-4 flex flex-col justify-between shadow-2xl">
+      <div class="flex items-center justify-between text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+        <span class="flex items-center gap-1.5 text-cyan-400">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"/></svg>
+          12-Stunden Vorschau
+        </span>
+        <span class="text-[10px] font-normal text-slate-500 lowercase">automatisch skaliert</span>
+      </div>
+
+      <!-- 12 Hours Container: Fixed flex distribution so no horizontal scroll is created -->
+      <div id="hourlyGrid" class="grid grid-cols-6 gap-2 h-full items-stretch pt-1">
+        <!-- 6 to 12 items rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- 6-Day Outlook (5 Cols) -->
+    <section class="col-span-5 rounded-3xl bg-kioskCard border border-kioskBorder backdrop-blur-2xl p-4 flex flex-col justify-between shadow-2xl">
+      <div class="flex items-center justify-between text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+        <span class="flex items-center gap-1.5 text-indigo-400">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 2v4M8 2v4M3 10h18"/></svg>
+          6-Tage Trend
+        </span>
+        <span class="text-[10px] font-mono text-slate-500">Min / Max</span>
+      </div>
+
+      <div id="dailyGrid" class="flex flex-col justify-between h-full pt-1 divide-y divide-slate-800/60">
+        <!-- 5-6 Day Rows dynamically injected -->
+      </div>
+    </section>
+
+  </footer>
+
+  <!-- Notification Toast -->
+  <div id="kioskToast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 border border-cyan-500/50 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 pointer-events-none text-xs">
+    <span id="toastDot" class="w-2 h-2 rounded-full bg-cyan-400"></span>
+    <span id="toastMsg">Status</span>
+  </div>
+
+  <!-- JavaScript Engine -->
+  <script>
+    // Configuration & State
+    const kiosk = {
+      lat: 50.9375, // Default: Cologne, Germany
+      lon: 6.9603,
+      name: 'Köln',
+      country: 'DE',
+      celsius: true,
+      data: null,
+      searchTimer: null
+    };
+
+    // WMO Weather Interpretation
+    const WEATHER_MAP = {
+      0: { label: 'Klarer Himmel', icon: 'sun', glow: '#f59e0b' },
+      1: { label: 'Meist heiter', icon: 'sun-cloud', glow: '#38bdf8' },
+      2: { label: 'Teilweise bewölkt', icon: 'cloud-sun', glow: '#38bdf8' },
+      3: { label: 'Bedeckt', icon: 'cloud', glow: '#64748b' },
+      45: { label: 'Nebel', icon: 'fog', glow: '#94a3b8' },
+      48: { label: 'Raureif-Nebel', icon: 'fog', glow: '#94a3b8' },
+      51: { label: 'Leichter Sprühregen', icon: 'drizzle', glow: '#0284c7' },
+      53: { label: 'Sprühregen', icon: 'drizzle', glow: '#0284c7' },
+      55: { label: 'Dichter Sprühregen', icon: 'drizzle', glow: '#0369a1' },
+      61: { label: 'Leichter Regen', icon: 'rain', glow: '#0284c7' },
+      63: { label: 'Mäßiger Regen', icon: 'rain-heavy', glow: '#1d4ed8' },
+      65: { label: 'Starker Regen', icon: 'rain-heavy', glow: '#1d4ed8' },
+      71: { label: 'Leichter Schnee', icon: 'snow', glow: '#bae6fd' },
+      73: { label: 'Schneefall', icon: 'snow', glow: '#e0f2fe' },
+      75: { label: 'Starker Schneefall', icon: 'snow-heavy', glow: '#ffffff' },
+      77: { label: 'Schneegriesel', icon: 'snow', glow: '#bae6fd' },
+      80: { label: 'Regenschauer', icon: 'rain', glow: '#0284c7' },
+      81: { label: 'Kräftige Schauer', icon: 'rain-heavy', glow: '#1d4ed8' },
+      82: { label: 'Wolkenbruch', icon: 'rain-heavy', glow: '#1e40af' },
+      85: { label: 'Schneeschauer', icon: 'snow', glow: '#e0f2fe' },
+      86: { label: 'Starke Schneeschauer', icon: 'snow-heavy', glow: '#ffffff' },
+      95: { label: 'Gewitter', icon: 'thunder', glow: '#eab308' },
+      96: { label: 'Gewitter mit Hagel', icon: 'thunder', glow: '#a855f7' },
+      99: { label: 'Schweres Gewitter', icon: 'thunder', glow: '#9333ea' }
+    };
+
+    function getVectorIcon(iconType, sizeClass = "w-7 h-7") {
+      switch (iconType) {
+        case 'sun':
+          return `<svg class="${sizeClass} text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07 7.07l-1.41-1.41M6.34 6.34L4.93 4.93m14.14 0l-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>`;
+        case 'sun-cloud':
+        case 'cloud-sun':
+          return `<svg class="${sizeClass} text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m14-5a6 6 0 00-11.3 2A5 5 0 005 18h13a4 4 0 000-8 6 6 0 00-4-3z"/></svg>`;
+        case 'cloud':
+          return `<svg class="${sizeClass} text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h11a4 4 0 001.5-7.7 5.5 5.5 0 00-10.8-1.8A4.5 4.5 0 003 15z"/></svg>`;
+        case 'drizzle':
+        case 'rain':
+          return `<svg class="${sizeClass} text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 16.58A5 5 0 0018 7h-1.26A8 8 0 104 15.25M8 19v2m4-3v2m4-1v2"/></svg>`;
+        case 'rain-heavy':
+          return `<svg class="${sizeClass} text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 16.58A5 5 0 0018 7h-1.26A8 8 0 104 15.25M8 17v4m4-3v4m4-2v4"/></svg>`;
+        case 'snow':
+        case 'snow-heavy':
+          return `<svg class="${sizeClass} text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v20m10-10H2m15.07 7.07l-14.14-14.14m14.14 0l-14.14 14.14"/></svg>`;
+        case 'thunder':
+          return `<svg class="${sizeClass} text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`;
+        case 'fog':
+        default:
+          return `<svg class="${sizeClass} text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 12h16M4 16h16M7 20h10"/></svg>`;
+      }
+    }
+
+    // High Precision Digital Clock
+    function tickClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+
+      document.getElementById('clockHM').textContent = `${h}:${m}`;
+      document.getElementById('clockSec').textContent = s;
+
+      // German locale strings
+      const weekday = now.toLocaleDateString('de-DE', { weekday: 'long' });
+      const fullDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      document.getElementById('clockWeekday').textContent = weekday;
+      document.getElementById('clockFullDate').textContent = fullDate;
+
+      // Calendar Week Calculation (ISO 8601)
+      const target = new Date(now.valueOf());
+      const dayNr = (now.getDay() + 6) % 7;
+      target.setDate(target.getDate() - dayNr + 3);
+      const firstThursday = target.valueOf();
+      target.setMonth(0, 1);
+      if (target.getDay() !== 4) {
+        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+      }
+      const kw = 1 + Math.ceil((firstThursday - target) / 604800000);
+      document.getElementById('clockKW').textContent = `KW ${kw}`;
+    }
+
+    // Unit Converter
+    function toDisplayTemp(cVal) {
+      if (cVal === undefined || cVal === null) return '--';
+      if (!kiosk.celsius) {
+        return Math.round((cVal * 9/5) + 32);
+      }
+      return Math.round(cVal);
+    }
+
+    // Weather Data Fetcher (Open-Meteo)
+    async function fetchKioskWeather() {
+      const refreshSvg = document.getElementById('refreshSvg');
+      refreshSvg.classList.add('animate-spin');
+
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${kiosk.lat}&longitude=${kiosk.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,dew_point_2m&hourly=temperature_2m,weather_code,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=7`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Network error');
+        kiosk.data = await res.json();
+
+        renderKioskDashboard();
+
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        document.getElementById('updateTimestamp').textContent = `Stand ${timeStr}`;
+        showToast('Wetterdaten aktualisiert');
+      } catch (err) {
+        console.error(err);
+        showToast('Abruffehler Wetterdaten');
+      } finally {
+        setTimeout(() => refreshSvg.classList.remove('animate-spin'), 600);
+      }
+    }
+
+    // Dashboard Renderer
+    function renderKioskDashboard() {
+      if (!kiosk.data) return;
+      const cur = kiosk.data.current;
+      const daily = kiosk.data.daily;
+      const hourly = kiosk.data.hourly;
+
+      // 1. Current State
+      const weather = WEATHER_MAP[cur.weather_code] || { label: 'Heiter', icon: 'sun-cloud', glow: '#38bdf8' };
+      
+      document.getElementById('tempHero').textContent = `${toDisplayTemp(cur.temperature_2m)}°`;
+      document.getElementById('conditionHero').textContent = weather.label;
+      document.getElementById('feelsLikeHero').textContent = `Gefühlt wie ${toDisplayTemp(cur.apparent_temperature)}°`;
+      
+      document.getElementById('weatherIconContainer').innerHTML = getVectorIcon(weather.icon, "w-16 h-16 xl:w-20 xl:h-20");
+
+      // Dynamic ambient back-glow matching current weather
+      document.getElementById('glowPrimary').style.backgroundColor = weather.glow;
+
+      // 2. Metrics
+      document.getElementById('metricHumidity').textContent = `${Math.round(cur.relative_humidity_2m)}%`;
+      document.getElementById('metricDew').textContent = `Tau: ${toDisplayTemp(cur.dew_point_2m)}°`;
+
+      document.getElementById('metricWindSpeed').innerHTML = `${Math.round(cur.wind_speed_10m)} <span class="text-xs font-normal">km/h</span>`;
+      document.getElementById('metricWindDir').textContent = `${cur.wind_direction_10m}° (${getCardinal(cur.wind_direction_10m)})`;
+      document.getElementById('windArrowSvg').style.transform = `rotate(${cur.wind_direction_10m}deg)`;
+
+      // Precipitation
+      const curHourIdx = new Date().getHours();
+      const rainProb = hourly.precipitation_probability ? hourly.precipitation_probability[curHourIdx] : 0;
+      document.getElementById('metricRainProb').textContent = `${rainProb}%`;
+      document.getElementById('metricPrecipAmount').textContent = `${(cur.precipitation || 0).toFixed(1)} mm`;
+
+      // Pressure & UV
+      document.getElementById('metricPressure').textContent = Math.round(cur.surface_pressure);
+      
+      const uv = cur.uv_index || 0;
+      document.getElementById('metricUVVal').textContent = uv.toFixed(1);
+      const uvLabelEl = document.getElementById('metricUVStatus');
+      if (uv < 3) { uvLabelEl.textContent = 'Gering'; uvLabelEl.className = 'text-[10px] text-emerald-400 font-semibold truncate'; }
+      else if (uv < 6) { uvLabelEl.textContent = 'Mäßig'; uvLabelEl.className = 'text-[10px] text-amber-400 font-semibold truncate'; }
+      else if (uv < 8) { uvLabelEl.textContent = 'Hoch'; uvLabelEl.className = 'text-[10px] text-orange-400 font-semibold truncate'; }
+      else { uvLabelEl.textContent = 'Sehr hoch'; uvLabelEl.className = 'text-[10px] text-rose-400 font-semibold truncate'; }
+
+      document.getElementById('metricGusts').innerHTML = `${Math.round(cur.wind_gusts_10m)} <span class="text-xs font-normal">km/h</span>`;
+
+      // 3. Sun Times
+      if (daily.sunrise && daily.sunrise[0]) {
+        document.getElementById('sunRiseVal').textContent = formatClockTime(new Date(daily.sunrise[0]));
+        document.getElementById('sunSetVal').textContent = formatClockTime(new Date(daily.sunset[0]));
+      }
+
+      // 4. Fixed 12-Hour Timeline (6 or 12 discrete slots formatted to fit layout perfectly)
+      renderTimeline(hourly);
+
+      // 5. Daily Forecast
+      renderDailyForecast(daily);
+    }
+
+    function formatClockTime(date) {
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function getCardinal(deg) {
+      const cardinals = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+      return cardinals[Math.round(deg / 45) % 8];
+    }
+
+    function renderTimeline(hourly) {
+      const container = document.getElementById('hourlyGrid');
+      container.innerHTML = '';
+      const now = new Date();
+      let startIndex = 0;
+
+      for (let i = 0; i < hourly.time.length; i++) {
+        if (new Date(hourly.time[i]) >= now) {
+          startIndex = i;
+          break;
+        }
+      }
+
+      // Exactly 6 cards filling the grid completely without scrollbars
+      for (let i = startIndex; i < startIndex + 6 && i < hourly.time.length; i++) {
+        const itemDate = new Date(hourly.time[i]);
+        const temp = toDisplayTemp(hourly.temperature_2m[i]);
+        const code = hourly.weather_code[i];
+        const prob = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
+        const info = WEATHER_MAP[code] || { icon: 'sun-cloud' };
+        
+        const isNow = (i === startIndex);
+        const timeLabel = isNow ? 'Jetzt' : `${String(itemDate.getHours()).padStart(2, '0')}:00`;
+
+        const card = document.createElement('div');
+        card.className = `flex flex-col items-center justify-between p-2 rounded-2xl border transition duration-200 text-center ${
+          isNow ? 'bg-cyan-950/40 border-cyan-500/40' : 'bg-slate-900/60 border-slate-800'
+        }`;
+        card.innerHTML = `
+          <span class="text-[11px] font-mono font-bold ${isNow ? 'text-cyan-300' : 'text-slate-400'}">${timeLabel}</span>
+          <div class="my-0.5">${getVectorIcon(info.icon, "w-6 h-6")}</div>
+          <span class="text-sm font-bold font-display text-white">${temp}°</span>
+          <span class="text-[10px] font-mono text-cyan-400/90">${prob}%</span>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function renderDailyForecast(daily) {
+      const container = document.getElementById('dailyGrid');
+      container.innerHTML = '';
+
+      // Render 5 upcoming days
+      const daysToShow = Math.min(6, daily.time.length);
+      for (let i = 1; i < daysToShow; i++) {
+        const dDate = new Date(daily.time[i]);
+        const dayName = i === 1 ? 'Morgen' : dDate.toLocaleDateString('de-DE', { weekday: 'short' });
+        const code = daily.weather_code[i];
+        const info = WEATHER_MAP[code] || { icon: 'sun-cloud', label: 'Heiter' };
+        const maxT = toDisplayTemp(daily.temperature_2m_max[i]);
+        const minT = toDisplayTemp(daily.temperature_2m_min[i]);
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between py-1 text-xs';
+        row.innerHTML = `
+          <span class="w-14 font-semibold text-white truncate">${dayName}</span>
+          <div class="flex items-center gap-1.5 w-24">
+            ${getVectorIcon(info.icon, "w-4 h-4")}
+            <span class="text-[11px] text-slate-400 truncate">${info.label}</span>
+          </div>
+          <div class="flex items-center gap-2 font-mono text-xs">
+            <span class="text-slate-500">${minT}°</span>
+            <div class="w-10 h-1 rounded-full bg-slate-800 overflow-hidden relative">
+              <div class="absolute inset-y-0 bg-gradient-to-r from-cyan-400 to-amber-400 rounded-full" style="left: 10%; right: 10%;"></div>
+            </div>
+            <span class="text-white font-bold">${maxT}°</span>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    // Geocoding & City Search
+    const searchInput = document.getElementById('citySearchInput');
+    const searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.trim();
+      clearTimeout(kiosk.searchTimer);
+      if (query.length < 2) {
+        searchResults.classList.add('hidden');
+        return;
+      }
+
+      kiosk.searchTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=de&format=json`);
+          const json = await res.json();
+          if (json.results && json.results.length > 0) {
+            renderSearchSuggestions(json.results);
+          } else {
+            searchResults.innerHTML = `<div class="p-3 text-xs text-slate-400">Keine Orte gefunden</div>`;
+            searchResults.classList.remove('hidden');
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 300);
+    });
+
+    function renderSearchSuggestions(places) {
+      searchResults.innerHTML = '';
+      places.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'p-2.5 hover:bg-slate-800 cursor-pointer flex flex-col text-left transition';
+        const region = p.admin1 ? `, ${p.admin1}` : '';
+        item.innerHTML = `
+          <span class="text-xs font-bold text-white">${p.name}</span>
+          <span class="text-[10px] text-slate-400">${p.country || ''}${region}</span>
+        `;
+        item.addEventListener('click', () => {
+          kiosk.lat = p.latitude;
+          kiosk.lon = p.longitude;
+          kiosk.name = p.name;
+          kiosk.country = p.country_code || '';
+          document.getElementById('locationName').textContent = `${p.name}, ${kiosk.country}`;
+          searchResults.classList.add('hidden');
+          searchInput.value = '';
+          fetchKioskWeather();
+        });
+        searchResults.appendChild(item);
+      });
+      searchResults.classList.remove('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('btnSearchOpen').addEventListener('click', () => {
+      searchInput.focus();
+    });
+
+    // Control Buttons
+    document.getElementById('btnToggleUnit').addEventListener('click', () => {
+      kiosk.celsius = !kiosk.celsius;
+      document.getElementById('btnToggleUnit').textContent = kiosk.celsius ? '°C' : '°F';
+      renderKioskDashboard();
+      showToast(`Einheit: ${kiosk.celsius ? 'Celsius' : 'Fahrenheit'}`);
+    });
+
+    document.getElementById('btnRefresh').addEventListener('click', () => {
+      fetchKioskWeather();
+    });
+
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    });
+
+    // Toast message helper
+    function showToast(msg) {
+      const toast = document.getElementById('kioskToast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 2500);
+    }
+
+    // Startup
+    window.onload = () => {
+      tickClock();
+      setInterval(tickClock, 1000);
+      fetchKioskWeather();
+      // Auto-refresh weather every 15 minutes
+      setInterval(fetchKioskWeather, 15 * 60 * 1000);
+    };
+  </script>
+</body>
+</html>
